@@ -1,0 +1,162 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: perfumes
+    // Fields:
+    //   - name: string (required, 1-100 chars)
+    //   - nameAr: string (optional, 1-100 chars)
+    //   - inspiredBy: string (required, 1-100 chars)
+    //   - inspiredByAr: string (optional, 1-100 chars)
+    //   - price: number (required, positive)
+    //   - oldPrice: number (optional, positive)
+    //   - description: string (optional, 0-1000 chars)
+    //   - descriptionAr: string (optional, 0-1000 chars)
+    //   - notes: string (optional, 0-500 chars)
+    //   - notesAr: string (optional, 0-500 chars)
+    //   - category: string (required, enum: Men, Women, Unisex)
+    //   - imageUrl: string (optional, valid URL)
+    //   - stock: int (optional, non-negative)
+    //   - isFeatured: bool (optional)
+    //   - createdAt: timestamp (optional)
+    //   - updatedAt: timestamp (optional)
+    //
+    // Collection: orders
+    // Fields:
+    //   - customerName: string (required, 1-100 chars)
+    //   - phoneNumber: string (required, 10-20 chars)
+    //   - address: string (required, 1-500 chars)
+    //   - wilaya: string (required, 1-50 chars)
+    //   - items: list (required, max 50 objects)
+    //   - totalAmount: number (required, positive)
+    //   - status: string (required, enum: pending, confirmed, shipped, delivered, cancelled)
+    //   - createdAt: timestamp (required)
+    //   - paymentMethod: string (required, enum: COD, SATIM)
+    //
+    // Collection: users
+    // Fields:
+    //   - uid: string (required, matches doc ID)
+    //   - email: string (required, valid email)
+    //   - role: string (required, enum: admin, staff)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (
+          (request.auth.token.email == "smbachir24@gmail.com" && request.auth.token.email_verified == true) ||
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+        );
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUrl(url) {
+      return url is string && (url.matches("^https://.*") || url.matches("^http://.*") || url.matches("^data:image/.*"));
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+    function isValidPerfume(data) {
+      return hasRequiredFields(['name', 'inspiredBy', 'price', 'category']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             (!('nameAr' in data) || (data.nameAr is string && data.nameAr.size() <= 100)) &&
+             data.inspiredBy is string && data.inspiredBy.size() > 0 && data.inspiredBy.size() <= 100 &&
+             (!('inspiredByAr' in data) || (data.inspiredByAr is string && data.inspiredByAr.size() <= 100)) &&
+             data.price is number && data.price > 0 &&
+             (!('oldPrice' in data) || (data.oldPrice is number && data.oldPrice > 0)) &&
+             data.category in ['Men', 'Women', 'Unisex'] &&
+             (!('description' in data) || (data.description is string && data.description.size() <= 1000)) &&
+             (!('descriptionAr' in data) || (data.descriptionAr is string && data.descriptionAr.size() <= 1000)) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 500)) &&
+             (!('notesAr' in data) || (data.notesAr is string && data.notesAr.size() <= 500)) &&
+             (!('imageUrl' in data) || isValidUrl(data.imageUrl)) &&
+             (!('stock' in data) || (data.stock is number && data.stock >= 0)) &&
+             (!('isFeatured' in data) || data.isFeatured is bool) &&
+             (!('createdAt' in data) || data.createdAt is timestamp) &&
+             (!('updatedAt' in data) || data.updatedAt is timestamp);
+    }
+
+    function isValidOrder(data) {
+      return hasRequiredFields(['customerName', 'phoneNumber', 'address', 'wilaya', 'items', 'totalAmount', 'status', 'createdAt', 'paymentMethod']) &&
+             data.customerName is string && data.customerName.size() > 0 && data.customerName.size() <= 100 &&
+             data.phoneNumber is string && data.phoneNumber.size() >= 6 && data.phoneNumber.size() <= 20 &&
+             data.address is string && data.address.size() > 0 && data.address.size() <= 500 &&
+             data.wilaya is string && data.wilaya.size() > 0 && data.wilaya.size() <= 100 &&
+             data.items is list && data.items.size() > 0 && data.items.size() <= 50 &&
+             data.totalAmount is number && data.totalAmount > 0 &&
+             data.status in ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'] &&
+             (data.createdAt is timestamp || data.createdAt == request.time) &&
+             data.paymentMethod in ['COD', 'SATIM'];
+    }
+
+    function isValidUser(data) {
+      return hasRequiredFields(['email', 'role']) &&
+             isValidEmail(data.email) &&
+             data.role in ['admin', 'staff', 'client'] &&
+             (!('uid' in data) || data.uid is string);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+    match /perfumes/{perfumeId} {
+      allow read: if true; // Publicly readable catalog
+      allow create, update: if isAdmin() && isValidPerfume(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /orders/{orderId} {
+      allow read: if isAdmin(); // Only admins can see all orders
+      allow create: if isValidOrder(request.resource.data) && request.resource.data.status == 'pending';
+      allow update: if isAdmin() && isValidOrder(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /subscribers/{subscriberId} {
+      allow read: if isAdmin();
+      allow create: if request.resource.data.email is string && 
+                      request.resource.data.email.size() > 0 &&
+                      request.resource.data.email.size() < 200 &&
+                      (request.resource.data.createdAt == request.time || !('createdAt' in request.resource.data));
+      allow delete: if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() && (isOwner(userId) || isAdmin()) && isValidUser(request.resource.data);
+      allow update: if (isOwner(userId) || isAdmin()) && isValidUser(request.resource.data);
+      allow delete: if isAdmin();
+    }
+  }
+}

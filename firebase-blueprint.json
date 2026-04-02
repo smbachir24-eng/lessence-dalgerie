@@ -1,0 +1,97 @@
+{
+  "entities": {
+    "Perfume": {
+      "title": "Perfume",
+      "description": "A perfume product in the store",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string", "description": "Name of the inspired-by perfume" },
+        "inspiredBy": { "type": "string", "description": "Original perfume name" },
+        "price": { "type": "number", "description": "Price in DZD" },
+        "oldPrice": { "type": "number", "description": "Original price before discount" },
+        "description": { "type": "string" },
+        "notes": { "type": "array", "items": { "type": "string" }, "description": "Top, heart, and base notes" },
+        "category": { "type": "string", "enum": ["Men", "Women", "Unisex"] },
+        "imageUrl": { "type": "string" },
+        "stock": { "type": "integer" },
+        "isFeatured": { "type": "boolean" }
+      },
+      "required": ["name", "inspiredBy", "price", "category"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "A customer order",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customerName": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "address": { "type": "string" },
+        "wilaya": { "type": "string" },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "perfumeId": { "type": "string" },
+              "name": { "type": "string" },
+              "quantity": { "type": "integer" },
+              "price": { "type": "number" }
+            }
+          }
+        },
+        "totalAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "shipped", "delivered", "cancelled"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "paymentMethod": { "type": "string", "enum": ["COD", "SATIM"] }
+      },
+      "required": ["customerName", "phoneNumber", "address", "wilaya", "items", "totalAmount", "status"]
+    },
+    "User": {
+      "title": "User",
+      "description": "Admin user profile",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "staff"] }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Settings": {
+      "title": "Settings",
+      "description": "App-wide configuration",
+      "type": "object",
+      "properties": {
+        "storeName": { "type": "string" },
+        "contactEmail": { "type": "string" },
+        "contactPhone": { "type": "string" },
+        "address": { "type": "string" },
+        "facebookUrl": { "type": "string" },
+        "instagramUrl": { "type": "string" },
+        "twitterUrl": { "type": "string" },
+        "deliveryFee": { "type": "number" },
+        "freeDeliveryThreshold": { "type": "number" }
+      }
+    }
+  },
+  "firestore": {
+    "/perfumes": {
+      "schema": "Perfume",
+      "description": "Collection of perfumes"
+    },
+    "/orders": {
+      "schema": "Order",
+      "description": "Collection of customer orders"
+    },
+    "/users": {
+      "schema": "User",
+      "description": "Admin users"
+    },
+    "/settings": {
+      "schema": "Settings",
+      "description": "App settings"
+    }
+  }
+}
