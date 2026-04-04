@@ -16,6 +16,7 @@ import { cn } from '../lib/utils';
 export default function App() {
   const [user, setUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [settingsLoading, setSettingsLoading] = useState(true);
   const [cartItems, setCartItems] = useState<any[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const { language, setLanguage, t, isRTL } = useLanguage();
@@ -41,6 +42,7 @@ export default function App() {
       if (doc.exists()) {
         setSettings(doc.data());
       }
+      setSettingsLoading(false);
     });
     return () => unsubscribeSettings();
   }, []);
@@ -139,6 +141,14 @@ export default function App() {
     );
   };
 
+  if (authLoading || settingsLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-[#fcfcfc]">
+        <div className="w-8 h-8 border-4 border-black border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <Router>
       <div className={cn("min-h-screen bg-[#fcfcfc] text-[#1a1a1a] font-sans", isRTL ? "font-arabic" : "font-sans")}>
@@ -162,9 +172,13 @@ export default function App() {
           <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-3 gap-12">
             <div className="space-y-4">
               <Link to="/" className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-black rounded-full flex items-center justify-center text-white font-serif italic">
-                  {(language === 'ar' ? (settings.storeNameAr || settings.storeName || 'D') : (settings.storeName || 'D')).charAt(0)}
-                </div>
+                {settings.logoUrl ? (
+                  <img src={settings.logoUrl} alt="Logo" className="h-10 w-auto object-contain" />
+                ) : (
+                  <div className="w-8 h-8 bg-black rounded-full flex items-center justify-center text-white font-serif italic">
+                    {(language === 'ar' ? (settings.storeNameAr || settings.storeName || 'D') : (settings.storeName || 'D')).charAt(0)}
+                  </div>
+                )}
                 <span className="text-xl font-serif italic tracking-tight">
                   {language === 'ar' ? (settings.storeNameAr || settings.storeName) : settings.storeName}
                 </span>
@@ -235,9 +249,13 @@ function Navbar({ user, cartCount, onCartClick, settings }: { user: any; cartCou
     <nav className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-gray-100">
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-black rounded-full flex items-center justify-center text-white font-serif italic">
-            {(language === 'ar' ? (settings.storeNameAr || settings.storeName || 'D') : (settings.storeName || 'D')).charAt(0)}
-          </div>
+          {settings.logoUrl ? (
+            <img src={settings.logoUrl} alt="Logo" className="h-8 w-auto object-contain" />
+          ) : (
+            <div className="w-8 h-8 bg-black rounded-full flex items-center justify-center text-white font-serif italic">
+              {(language === 'ar' ? (settings.storeNameAr || settings.storeName || 'D') : (settings.storeName || 'D')).charAt(0)}
+            </div>
+          )}
           <span className="text-xl font-serif italic tracking-tight">
             {language === 'ar' ? (settings.storeNameAr || settings.storeName) : settings.storeName}
           </span>

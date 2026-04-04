@@ -110,7 +110,13 @@ export default function Admin({ user, authLoading }: { user: any; authLoading: b
     }
   }, [perfumes, perfumesLoading, authLoading, searchParams, setSearchParams]);
 
-  if (authLoading) return <div className="flex items-center justify-center h-screen"><div className="w-8 h-8 border-4 border-black border-t-transparent rounded-full animate-spin" /></div>;
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-[#fcfcfc]">
+        <div className="w-8 h-8 border-4 border-black border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
   
   if (!user) return <Navigate to="/admin-portal" />;
   
@@ -214,7 +220,31 @@ export default function Admin({ user, authLoading }: { user: any; authLoading: b
 
   const stats = {
     totalRevenue: orders.reduce((acc, o) => o.status === 'delivered' ? acc + o.totalAmount : acc, 0),
+    todayRevenue: orders.reduce((acc, o) => {
+      if (o.status !== 'delivered' || !o.createdAt) return acc;
+      const orderDate = o.createdAt?.toDate?.() || new Date(o.createdAt);
+      const today = new Date();
+      if (orderDate.toDateString() === today.toDateString()) return acc + o.totalAmount;
+      return acc;
+    }, 0),
+    weekRevenue: orders.reduce((acc, o) => {
+      if (o.status !== 'delivered' || !o.createdAt) return acc;
+      const orderDate = o.createdAt?.toDate?.() || new Date(o.createdAt);
+      const today = new Date();
+      const lastWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+      if (orderDate >= lastWeek) return acc + o.totalAmount;
+      return acc;
+    }, 0),
+    monthRevenue: orders.reduce((acc, o) => {
+      if (o.status !== 'delivered' || !o.createdAt) return acc;
+      const orderDate = o.createdAt?.toDate?.() || new Date(o.createdAt);
+      const today = new Date();
+      if (orderDate.getMonth() === today.getMonth() && orderDate.getFullYear() === today.getFullYear()) return acc + o.totalAmount;
+      return acc;
+    }, 0),
     pendingOrders: orders.filter(o => o.status === 'pending').length,
+    confirmedOrders: orders.filter(o => o.status === 'confirmed').length,
+    shippedOrders: orders.filter(o => o.status === 'shipped').length,
     totalProducts: perfumes.length,
     deliveredOrders: orders.filter(o => o.status === 'delivered').length
   };
@@ -271,10 +301,17 @@ export default function Admin({ user, authLoading }: { user: any; authLoading: b
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard icon={<TrendingUp size={20} />} label="Revenu Livré" value={`${stats.totalRevenue} DZD`} color="bg-green-50 text-green-600" />
-        <StatCard icon={<Clock size={20} />} label="En Attente" value={stats.pendingOrders} color="bg-orange-50 text-orange-600" />
-        <StatCard icon={<Package size={20} />} label="Produits" value={stats.totalProducts} color="bg-blue-50 text-blue-600" />
-        <StatCard icon={<CheckCircle size={20} />} label="Livrés" value={stats.deliveredOrders} color="bg-purple-50 text-purple-600" />
+        <StatCard icon={<TrendingUp size={20} />} label={language === 'ar' ? 'إجمالي الإيرادات' : 'Revenu Total'} value={`${stats.totalRevenue} DZD`} color="bg-green-50 text-green-600" />
+        <StatCard icon={<TrendingUp size={20} />} label={language === 'ar' ? 'إيرادات اليوم' : "Revenu d'Aujourd'hui"} value={`${stats.todayRevenue} DZD`} color="bg-emerald-50 text-emerald-600" />
+        <StatCard icon={<TrendingUp size={20} />} label={language === 'ar' ? 'إيرادات الأسبوع' : 'Revenu de la Semaine'} value={`${stats.weekRevenue} DZD`} color="bg-teal-50 text-teal-600" />
+        <StatCard icon={<TrendingUp size={20} />} label={language === 'ar' ? 'إيرادات الشهر' : 'Revenu du Mois'} value={`${stats.monthRevenue} DZD`} color="bg-cyan-50 text-cyan-600" />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatCard icon={<Clock size={20} />} label={language === 'ar' ? 'طلبات معلقة' : 'En Attente'} value={stats.pendingOrders} color="bg-orange-50 text-orange-600" />
+        <StatCard icon={<Check size={20} />} label={language === 'ar' ? 'طلبات مؤكدة' : 'Confirmées'} value={stats.confirmedOrders} color="bg-blue-50 text-blue-600" />
+        <StatCard icon={<Truck size={20} />} label={language === 'ar' ? 'طلبات مشحونة' : 'Expédiées'} value={stats.shippedOrders} color="bg-indigo-50 text-indigo-600" />
+        <StatCard icon={<CheckCircle size={20} />} label={language === 'ar' ? 'طلبات مستلمة' : 'Livrés'} value={stats.deliveredOrders} color="bg-purple-50 text-purple-600" />
       </div>
 
       {activeTab === 'dashboard' && (
@@ -474,7 +511,31 @@ export default function Admin({ user, authLoading }: { user: any; authLoading: b
               <div className="flex-1 space-y-1">
                 <h3 className="font-serif italic">{perfume.name}</h3>
                 <p className="text-[10px] text-gray-400 uppercase tracking-tighter">Inspired by {perfume.inspiredBy}</p>
-                <p className="text-xs text-gray-400">Stock: {perfume.stock}</p>
+                <div className="flex items-center gap-3">
+                  <p className={cn("text-xs font-bold", perfume.stock <= 0 ? "text-red-500" : perfume.stock <= 5 ? "text-orange-500" : "text-gray-400")}>
+                    Stock: {perfume.stock}
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <button 
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        await updateDoc(doc(db, 'perfumes', perfume.id), { stock: increment(-1) });
+                      }}
+                      className="w-6 h-6 flex items-center justify-center bg-gray-100 rounded-md hover:bg-gray-200 text-xs"
+                    >
+                      -
+                    </button>
+                    <button 
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        await updateDoc(doc(db, 'perfumes', perfume.id), { stock: increment(1) });
+                      }}
+                      className="w-6 h-6 flex items-center justify-center bg-gray-100 rounded-md hover:bg-gray-200 text-xs"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
                 <div className="flex items-center gap-2">
                   <span className="font-medium">{perfume.price} DZD</span>
                   {perfume.oldPrice && <span className="text-[10px] text-gray-400 line-through">{perfume.oldPrice}</span>}
@@ -732,7 +793,38 @@ export default function Admin({ user, authLoading }: { user: any; authLoading: b
           <form onSubmit={saveSettings} className="space-y-10">
             <div className="space-y-6">
               <h3 className="text-xl font-serif italic border-b pb-2">Design de la Boutique</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div className="space-y-4">
+                  <label className="text-[10px] font-bold uppercase text-gray-400">Logo de la Boutique</label>
+                  <div className="relative group aspect-square rounded-3xl overflow-hidden bg-gray-50 border-2 border-dashed border-gray-200 flex items-center justify-center">
+                    {settings.logoUrl ? (
+                      <>
+                        <img src={settings.logoUrl} className="w-full h-full object-contain p-4" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <button 
+                            type="button"
+                            onClick={() => setSettings({ ...settings, logoUrl: '' })}
+                            className="p-2 bg-white rounded-full text-red-500"
+                          >
+                            <Trash2 size={20} />
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <label className="cursor-pointer flex flex-col items-center gap-2 text-gray-400">
+                        <Upload size={32} />
+                        <span className="text-xs">Logo</span>
+                        <input 
+                          type="file" 
+                          className="hidden" 
+                          accept="image/*"
+                          onChange={(e) => handleSettingsImageUpload(e, 'logoUrl')}
+                        />
+                      </label>
+                    )}
+                  </div>
+                </div>
+
                 <div className="space-y-4">
                   <label className="text-[10px] font-bold uppercase text-gray-400">Image de Couverture (Hero)</label>
                   <div className="relative group aspect-video rounded-3xl overflow-hidden bg-gray-50 border-2 border-dashed border-gray-200 flex items-center justify-center">
